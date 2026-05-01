@@ -1,0 +1,153 @@
+/* styles/Footer.module.css */
+
+.footer {
+  background: var(--navy);
+  color: #94afc8;
+}
+
+.footerTop {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 48px;
+  padding: 60px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Brand ─────────────────────────────────────────────────────────────── */
+.footerLogo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.footerLogoIcon {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-light));
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.footerLogoIcon svg { width: 22px; height: 22px; fill: white; }
+
+.footerLogoName {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: white;
+  line-height: 1.25;
+}
+
+.footerLogoSub {
+  font-size: 0.68rem;
+  color: var(--teal-light);
+  letter-spacing: 0.06em;
+}
+
+.footerDesc {
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: #6b87a8;
+  margin-bottom: 22px;
+}
+
+/* ─── Socials ────────────────────────────────────────────────────────────── */
+.socialLinks {
+  display: flex;
+  gap: 10px;
+}
+
+.socialLink {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94afc8;
+  transition: var(--transition);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.socialLink:hover {
+  background: var(--teal);
+  color: white;
+  border-color: var(--teal);
+}
+
+.socialLink svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* ─── Columns ────────────────────────────────────────────────────────────── */
+.footerColTitle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.footerLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footerLink {
+  font-size: 0.875rem;
+  color: #6b87a8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.footerLink::before {
+  content: '›';
+  color: var(--teal);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.footerLink:hover {
+  color: white;
+  padding-left: 4px;
+}
+
+.footerLink:hover::before { opacity: 1; }
+
+/* ─── Bottom Bar ─────────────────────────────────────────────────────────── */
+.footerBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  font-size: 0.82rem;
+  color: #4a6280;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footerBottomLinks { display: flex; gap: 16px; }
+
+.footerBottomLinks a {
+  color: var(--teal-light);
+  transition: color 0.2s;
+}
+
+.footerBottomLinks a:hover { color: white; }
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .footerTop { grid-template-columns: 1fr 1fr; gap: 36px; }
+}
+
+@media (max-width: 640px) {
+  .footerTop { grid-template-columns: 1fr; }
+  .footerBottom { flex-direction: column; text-align: center; }
+}
