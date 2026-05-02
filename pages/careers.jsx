@@ -1,163 +1,259 @@
-// pages/careers.jsx  ── Careers Page with live application form
-import { useState } from "react";
+// pages/careers.jsx
+import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
-import s from "../styles/Sections.module.css";
-import { CheckCircleIcon } from "../components/Icons";
 
-const openings = [
-  { title:"Senior Cardiologist",              dept:"Cardiology",    type:"Full-time" },
-  { title:"Staff Nurse (ICU)",                dept:"Critical Care", type:"Full-time" },
-  { title:"Medical Lab Technologist",         dept:"Diagnostics",   type:"Full-time" },
-  { title:"Radiographer",                     dept:"Radiology",     type:"Full-time" },
-  { title:"Receptionist / Patient Coordinator", dept:"Admin",       type:"Full-time" },
-  { title:"Physiotherapist",                  dept:"Rehabilitation", type:"Part-time" },
-];
+const EMPTY_FORM = {
+  name: "", email: "", phone: "", position: "",
+  experience: "", cover_letter: "",
+};
 
-const EMPTY = { name:"", email:"", phone:"", position:"", experience:"", coverLetter:"" };
-
-function ApplyModal({ position, onClose }) {
-  const [form, setForm]           = useState({ ...EMPTY, position });
+export default function CareersPage() {
+  const [jobs, setJobs]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [modal, setModal]         = useState(null); // selected job
+  const [form, setForm]           = useState(EMPTY_FORM);
+  const [cvFile, setCvFile]       = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
+
+  useEffect(() => {
+    fetch("/api/job-postings")
+      .then((r) => r.json())
+      .then((d) => { setJobs(d.data || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const openModal = (job) => {
+    setModal(job);
+    setForm({ ...EMPTY_FORM, position: job.title });
+    setSubmitted(false);
+    setError("");
+    setCvFile(null);
+  };
 
   const handleChange = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
+  const uploadCV = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bucket", "uploads");
+    formData.append("folder", "cvs");
+
+    // Upload directly to Supabase Storage via fetch
+    const fileName = `cvs/${Date.now()}_${file.name.replace(/\s/g, "_")}`;
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/uploads/${fileName}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+
+    if (!res.ok) throw new Error("CV upload failed");
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${fileName}`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
+    setSubmitting(true);
+
     try {
-      const res  = await fetch("/api/careers", {
-        method:  "POST",
-        headers: { "Content-Type":"application/json" },
-        body:    JSON.stringify(form),
+      let cv_url = null;
+      if (cvFile) cv_url = await uploadCV(cvFile);
+
+      const res = await fetch("/api/careers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, cv_url, job_posting_id: modal?.id }),
       });
       const data = await res.json();
-      if (!res.ok) setError(data.error || "Something went wrong.");
-      else setSubmitted(true);
-    } catch {
-      setError("Network error. Please try again.");
+      if (!res.ok) throw new Error(data.error);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message || "Something went wrong.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(10,22,40,0.7)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-      <div style={{ background:"white", borderRadius:16, maxWidth:560, width:"100%", maxHeight:"90vh", overflowY:"auto", padding:"36px 32px", position:"relative" }}>
-        <button onClick={onClose} style={{ position:"absolute", top:16, right:20, background:"none", border:"none", fontSize:24, cursor:"pointer", color:"var(--gray)" }}>✕</button>
+    <Layout>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+        <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--navy)", marginBottom: 8 }}>
+          Careers at SMMH
+        </h1>
+        <p style={{ color: "var(--gray)", marginBottom: 40 }}>
+          Join our team of dedicated healthcare professionals.
+        </p>
 
-        {submitted ? (
-          <div style={{ textAlign:"center", padding:"24px 0" }}>
-            <div style={{ width:68, height:68, background:"linear-gradient(135deg,#059669,#10b981)", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 18px" }}>
-              <CheckCircleIcon size={34} />
-            </div>
-            <h3 style={{ fontSize:"1.35rem", fontWeight:700, color:"var(--navy)", marginBottom:10 }}>Application Received!</h3>
-            <p style={{ color:"var(--gray)", lineHeight:1.75, marginBottom:24 }}>
-              Thank you, <strong>{form.name}</strong>! Your application for <strong>{form.position}</strong> has been submitted.
-              Our HR team will review it and contact you at <strong>{form.email}</strong>.
-            </p>
-            <button onClick={onClose} style={{ padding:"12px 32px", background:"var(--teal)", color:"white", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer" }}>
-              Close
-            </button>
+        {loading && <p>Loading opportunities...</p>}
+
+        {!loading && jobs.length === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "var(--gray)" }}>
+            <p style={{ fontSize: "1.1rem" }}>No open positions at the moment.</p>
+            <p>Check back soon or send your CV to <strong>hr@smmh.com.pk</strong></p>
           </div>
-        ) : (
-          <>
-            <h3 style={{ fontSize:"1.2rem", fontWeight:700, color:"var(--navy)", marginBottom:6 }}>Apply for Position</h3>
-            <p style={{ color:"var(--teal)", fontWeight:600, marginBottom:24 }}>{position}</p>
-            {error && (
-              <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:8, padding:"12px 16px", marginBottom:16, color:"#991b1b", fontSize:"0.88rem" }}>
-                ⚠️ {error}
-              </div>
-            )}
-            <form onSubmit={handleSubmit}>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:14 }}>
-                <div>
-                  <label className="form-label">Full Name *</label>
-                  <input className="form-input" name="name" placeholder="Your name" value={form.name} onChange={handleChange} required />
-                </div>
-                <div>
-                  <label className="form-label">Email *</label>
-                  <input className="form-input" name="email" type="email" placeholder="you@email.com" value={form.email} onChange={handleChange} required />
-                </div>
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:14 }}>
-                <div>
-                  <label className="form-label">Phone *</label>
-                  <input className="form-input" name="phone" type="tel" placeholder="03XX-XXXXXXX" value={form.phone} onChange={handleChange} required />
-                </div>
-                <div>
-                  <label className="form-label">Years of Experience</label>
-                  <input className="form-input" name="experience" placeholder="e.g. 5 years" value={form.experience} onChange={handleChange} />
-                </div>
-              </div>
-              <div style={{ marginBottom:20 }}>
-                <label className="form-label">Cover Letter / Note</label>
-                <textarea className="form-textarea" name="coverLetter" placeholder="Tell us why you are a great fit..." value={form.coverLetter} onChange={handleChange} style={{ height:100 }} />
-              </div>
-              <button type="submit" disabled={loading} style={{ width:"100%", padding:"13px", background:"var(--teal)", color:"white", border:"none", borderRadius:8, fontWeight:700, cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
-                {loading ? "Submitting…" : "Submit Application"}
-              </button>
-            </form>
-          </>
         )}
-      </div>
-    </div>
-  );
-}
 
-export default function CareersPage() {
-  const [activeJob, setActiveJob] = useState(null);
-
-  return (
-    <Layout title="Careers" description="Join the team at Saiera Miraj Memorial Hospital. View current job openings.">
-      <div style={{ background:"linear-gradient(135deg, var(--navy), #0a3d3d)", padding:"80px 0 60px", textAlign:"center", color:"white" }}>
-        <div className="container">
-          <span className="section-label" style={{ color:"var(--gold-light)", background:"rgba(201,168,76,0.15)" }}>Join Our Team</span>
-          <h1 className="section-title" style={{ color:"white", marginTop:12 }}>Career Opportunities</h1>
-          <p style={{ color:"#94afc8", maxWidth:540, margin:"0 auto", fontSize:"1.05rem", lineHeight:1.75 }}>
-            Be part of a team that makes a real difference in people&apos;s lives every day.
-            We offer a supportive environment, competitive compensation, and growth.
-          </p>
-        </div>
-      </div>
-
-      <section className="section">
-        <div className="container">
-          <div style={{ textAlign:"center", marginBottom:48 }}>
-            <span className="section-label">Open Positions</span>
-            <h2 className="section-title">Current Openings</h2>
-          </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-            {openings.map((job) => (
-              <div key={job.title} className="card reveal" style={{ padding:"24px 28px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:16 }}>
-                <div>
-                  <h3 style={{ fontSize:"1.05rem", fontWeight:600, marginBottom:6 }}>{job.title}</h3>
-                  <div style={{ display:"flex", gap:12 }}>
-                    <span style={{ fontSize:"0.82rem", color:"var(--teal)", fontWeight:500 }}>{job.dept}</span>
-                    <span style={{ fontSize:"0.82rem", color:"var(--gray)" }}>•</span>
-                    <span style={{ fontSize:"0.82rem", color:"var(--gray)" }}>{job.type}</span>
-                  </div>
+        <div style={{ display: "grid", gap: 20 }}>
+          {jobs.map((job) => (
+            <div key={job.id} style={{
+              background: "#fff", border: "1px solid #e5e7eb",
+              borderRadius: 12, padding: "24px 28px",
+              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+            }}>
+              <div>
+                <h3 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--navy)", marginBottom: 6 }}>
+                  {job.title}
+                </h3>
+                <div style={{ display: "flex", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+                  <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 10px", borderRadius: 20, fontSize: "0.8rem" }}>
+                    {job.department}
+                  </span>
+                  <span style={{ background: "#f0fdf4", color: "#166534", padding: "2px 10px", borderRadius: 20, fontSize: "0.8rem" }}>
+                    {job.type}
+                  </span>
+                  {job.deadline && (
+                    <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 10px", borderRadius: 20, fontSize: "0.8rem" }}>
+                      Deadline: {new Date(job.deadline).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
-                <button
-                  onClick={() => setActiveJob(job.title)}
-                  style={{ display:"inline-flex", alignItems:"center", gap:8, border:"1.5px solid var(--teal)", color:"var(--teal)", padding:"9px 20px", borderRadius:"var(--radius-sm)", fontWeight:600, fontSize:"0.88rem", background:"transparent", cursor:"pointer", transition:"all 0.25s" }}
-                >
-                  Apply Now
-                </button>
+                <p style={{ color: "#4b5563", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                  {job.description}
+                </p>
               </div>
-            ))}
-          </div>
-          <p style={{ textAlign:"center", marginTop:32, color:"var(--gray)", fontSize:"0.9rem" }}>
-            Don&apos;t see your role? Send your CV to{" "}
-            <a href="mailto:hr@smmh.com.pk" style={{ color:"var(--teal)", fontWeight:600 }}>hr@smmh.com.pk</a>
-          </p>
+              <button
+                onClick={() => openModal(job)}
+                style={{
+                  marginLeft: 24, whiteSpace: "nowrap",
+                  background: "var(--teal, #0d9488)", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "10px 20px",
+                  fontWeight: 600, cursor: "pointer", fontSize: "0.9rem",
+                }}
+              >
+                Apply Now
+              </button>
+            </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      {activeJob && <ApplyModal position={activeJob} onClose={() => setActiveJob(null)} />}
+      {/* Apply Modal */}
+      {modal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 24,
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 16, padding: 32,
+            maxWidth: 540, width: "100%", maxHeight: "90vh", overflowY: "auto",
+          }}>
+            {submitted ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div style={{
+                  width: 64, height: 64, background: "#10b981",
+                  borderRadius: "50%", display: "flex", alignItems: "center",
+                  justifyContent: "center", margin: "0 auto 16px", fontSize: 28,
+                }}>✓</div>
+                <h3 style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--navy)", marginBottom: 8 }}>
+                  Application Submitted!
+                </h3>
+                <p style={{ color: "#4b5563", marginBottom: 20 }}>
+                  Thank you for applying for <strong>{modal.title}</strong>. We will be in touch soon.
+                </p>
+                <button onClick={() => setModal(null)} style={{
+                  background: "var(--teal, #0d9488)", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "10px 24px",
+                  fontWeight: 600, cursor: "pointer",
+                }}>Close</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+                  <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--navy)" }}>
+                    Apply — {modal.title}
+                  </h3>
+                  <button onClick={() => setModal(null)} style={{
+                    background: "none", border: "none", fontSize: 20,
+                    cursor: "pointer", color: "#6b7280",
+                  }}>✕</button>
+                </div>
+
+                {error && (
+                  <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#991b1b", fontSize: "0.88rem" }}>
+                    ⚠️ {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit}>
+                  {[
+                    { label: "Full Name *", name: "name", type: "text", placeholder: "Ahmed Khan" },
+                    { label: "Email *", name: "email", type: "email", placeholder: "you@email.com" },
+                    { label: "Phone *", name: "phone", type: "tel", placeholder: "03XX-XXXXXXX" },
+                  ].map((f) => (
+                    <div key={f.name} style={{ marginBottom: 14 }}>
+                      <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: 4, color: "var(--navy)" }}>{f.label}</label>
+                      <input
+                        type={f.type} name={f.name} placeholder={f.placeholder}
+                        value={form[f.name]} onChange={handleChange} required
+                        style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9rem", boxSizing: "border-box" }}
+                      />
+                    </div>
+                  ))}
+
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: 4, color: "var(--navy)" }}>Years of Experience</label>
+                    <select name="experience" value={form.experience} onChange={handleChange}
+                      style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9rem" }}>
+                      <option value="">Select</option>
+                      <option>Fresh Graduate</option>
+                      <option>1-2 years</option>
+                      <option>3-5 years</option>
+                      <option>5-10 years</option>
+                      <option>10+ years</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: 4, color: "var(--navy)" }}>Cover Letter</label>
+                    <textarea name="cover_letter" value={form.cover_letter} onChange={handleChange}
+                      placeholder="Tell us why you are a good fit..."
+                      style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9rem", height: 80, resize: "vertical", boxSizing: "border-box" }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: 4, color: "var(--navy)" }}>Upload CV (PDF/DOC)</label>
+                    <input type="file" accept=".pdf,.doc,.docx"
+                      onChange={(e) => setCvFile(e.target.files[0])}
+                      style={{ width: "100%", padding: "8px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.85rem" }}
+                    />
+                    {cvFile && <p style={{ fontSize: "0.8rem", color: "#059669", marginTop: 4 }}>✓ {cvFile.name}</p>}
+                  </div>
+
+                  <button type="submit" disabled={submitting} style={{
+                    width: "100%", background: "var(--teal, #0d9488)", color: "#fff",
+                    border: "none", borderRadius: 8, padding: "12px",
+                    fontWeight: 700, fontSize: "0.95rem", cursor: submitting ? "not-allowed" : "pointer",
+                    opacity: submitting ? 0.7 : 1,
+                  }}>
+                    {submitting ? "Submitting..." : "Submit Application"}
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

@@ -1,245 +1,505 @@
+// pages/admin.jsx
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
 
 const ADMIN_PASSWORD = "smmh2026";
 const LAB_PASSWORD   = "smmhlab2026";
 
-export default function AdminDashboard() {
-  const [password, setPassword]         = useState("");
-  const [loggedIn, setLoggedIn]         = useState("");
-  const [error, setError]               = useState("");
-  const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [activeTab, setActiveTab]       = useState("pending");
-  const [labMrn, setLabMrn]             = useState("");
-  const [labName, setLabName]           = useState("");
-  const [labPhone, setLabPhone]         = useState("");
-  const [labTestName, setLabTestName]   = useState("");
-  const [labFile, setLabFile]           = useState(null);
-  const [labUploading, setLabUploading] = useState(false);
-  const [labSuccess, setLabSuccess]     = useState("");
-  const [labError, setLabError]         = useState("");
+const ADMIN_TABS = ["Appointments", "Job Applications", "Contact Messages", "Job Postings", "Announcements"];
+const LAB_TABS   = ["Lab Results"];
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD)    { setLoggedIn("admin"); setError(""); }
-    else if (password === LAB_PASSWORD) { setLoggedIn("lab");   setError(""); }
-    else setError("Incorrect password. Try again.");
+const btn = (bg, color = "#fff") => ({
+  background: bg, color, border: "none", borderRadius: 6,
+  padding: "6px 14px", fontWeight: 600, cursor: "pointer", fontSize: "0.82rem",
+});
+
+export default function AdminDashboard() {
+  const [authed, setAuthed]   = useState(false);
+  const [role, setRole]       = useState("");
+  const [pw, setPw]           = useState("");
+  const [pwErr, setPwErr]     = useState("");
+  const [tab, setTab]         = useState("Appointments");
+  const [loading, setLoading] = useState(false);
+
+  // Admin data states
+  const [appointments, setAppointments]   = useState([]);
+  const [applications, setApplications]   = useState([]);
+  const [messages, setMessages]           = useState([]);
+  const [jobPostings, setJobPostings]     = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+
+  // Admin form states
+  const [jobForm, setJobForm] = useState({ title: "", department: "", type: "Full-time", description: "", deadline: "" });
+  const [newsForm, setNewsForm] = useState({ title: "", description: "", image_url: "" });
+  const [newsImage, setNewsImage] = useState(null);
+  const [posting, setPosting] = useState(false);
+  const [postMsg, setPostMsg] = useState("");
+
+  // Lab states
+  const [labResults, setLabResults]   = useState([]);
+  const [labLoading, setLabLoading]   = useState(false);
+  const [labFile, setLabFile]         = useState(null);
+  const [labUploading, setLabUploading] = useState(false);
+  const [labMsg, setLabMsg]           = useState("");
+  const [labForm, setLabForm]         = useState({
+    mrn: "", patient_name: "", phone: "", test_name: "", expires_days: "30"
+  });
+
+  const login = () => {
+    if (pw === ADMIN_PASSWORD)     { setAuthed(true); setRole("admin"); setTab("Appointments"); }
+    else if (pw === LAB_PASSWORD)  { setAuthed(true); setRole("lab");   setTab("Lab Results"); }
+    else setPwErr("Incorrect password.");
   };
 
-  const fetchAppointments = async () => {
+  // ── Fetch admin data ────────────────────────────────────────────────────────
+  const fetchAll = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("appointments").select("*")
-      .order("created_at", { ascending: false });
-    if (error) console.error("Fetch error:", error);
-    else setAppointments(data);
+    try {
+      const [a, ap, m, jp, an] = await Promise.all([
+        fetch("/api/appointments?admin=1").then(r => r.json()),
+        fetch("/api/careers?admin=1").then(r => r.json()),
+        fetch("/api/contact?admin=1").then(r => r.json()),
+        fetch("/api/job-postings?admin=1").then(r => r.json()),
+        fetch("/api/news?admin=1").then(r => r.json()),
+      ]);
+      setAppointments(a.data || []);
+      setApplications(ap.data || []);
+      setMessages(m.data || []);
+      setJobPostings(jp.data || []);
+      setAnnouncements(an.data || []);
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  const updateStatus = async (id, status) => {
-    const { error } = await supabase
-      .from("appointments").update({ status }).eq("id", id);
-    if (error) alert("Error: " + error.message);
-    else fetchAppointments();
+  // ── Fetch lab results ───────────────────────────────────────────────────────
+  const fetchLabResults = async () => {
+    setLabLoading(true);
+    try {
+      const res = await fetch("/api/lab-results");
+      const data = await res.json();
+      setLabResults(data.data || []);
+    } catch (e) { console.error(e); }
+    setLabLoading(false);
   };
 
-  const uploadLabResult = async (e) => {
+  useEffect(() => {
+    if (authed && role === "admin") fetchAll();
+    if (authed && role === "lab")   fetchLabResults();
+  }, [authed, role]);
+
+  const deleteRow = async (endpoint, id, setter, list) => {
+    if (!confirm("Delete this record?")) return;
+    await fetch(endpoint, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    setter(list.filter(r => r.id !== id));
+  };
+
+  // ── Upload image for announcements ──────────────────────────────────────────
+  const uploadImage = async (file) => {
+    const fileName = `news/${Date.now()}_${file.name.replace(/\s/g, "_")}`;
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/uploads/${fileName}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+    if (!res.ok) throw new Error("Image upload failed");
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${fileName}`;
+  };
+
+  // ── Upload lab result file ──────────────────────────────────────────────────
+  const uploadLabFile = async (file) => {
+    const fileName = `${Date.now()}_${file.name.replace(/\s/g, "_")}`;
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/lab-results/${fileName}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+    if (!res.ok) throw new Error("File upload failed");
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/lab-results/${fileName}`;
+  };
+
+  const postJob = async (e) => {
     e.preventDefault();
-    setLabUploading(true); setLabError(""); setLabSuccess("");
+    setPosting(true); setPostMsg("");
+    const res = await fetch("/api/job-postings", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(jobForm),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setPostMsg("✅ Job posted successfully!");
+      setJobPostings(p => [data.data[0], ...p]);
+      setJobForm({ title: "", department: "", type: "Full-time", description: "", deadline: "" });
+    } else setPostMsg("❌ " + data.error);
+    setPosting(false);
+  };
+
+  const postNews = async (e) => {
+    e.preventDefault();
+    setPosting(true); setPostMsg("");
     try {
-      const { createClient } = await import("@supabase/supabase-js");
-      const sb = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      );
-      const fileExt  = labFile.name.split(".").pop();
-      const fileName = `${labMrn}-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await sb.storage
-        .from("lab-results").upload(fileName, labFile);
-      if (uploadError) throw new Error(uploadError.message);
-      const { data: urlData } = sb.storage
-        .from("lab-results").getPublicUrl(fileName);
+      let image_url = newsForm.image_url;
+      if (newsImage) image_url = await uploadImage(newsImage);
+      const res = await fetch("/api/news", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newsForm, image_url }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPostMsg("✅ Announcement posted!");
+        setAnnouncements(p => [data.data[0], ...p]);
+        setNewsForm({ title: "", description: "", image_url: "" });
+        setNewsImage(null);
+      } else setPostMsg("❌ " + data.error);
+    } catch (err) { setPostMsg("❌ " + err.message); }
+    setPosting(false);
+  };
+
+  // ── Submit lab result ───────────────────────────────────────────────────────
+  const submitLabResult = async (e) => {
+    e.preventDefault();
+    if (!labFile) return setLabMsg("❌ Please select a file to upload.");
+    setLabUploading(true); setLabMsg("");
+    try {
+      const file_url  = await uploadLabFile(labFile);
+      const file_type = labFile.type || "application/octet-stream";
+      const expires_at = new Date(Date.now() + parseInt(labForm.expires_days) * 86400000).toISOString();
+
       const res = await fetch("/api/lab-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mrn: labMrn, patient_name: labName, phone: labPhone,
-          test_name: labTestName, file_url: urlData.publicUrl,
-          file_type: fileExt === "pdf" ? "pdf" : "image"
-        })
+          mrn:          labForm.mrn,
+          patient_name: labForm.patient_name,
+          phone:        labForm.phone,
+          test_name:    labForm.test_name,
+          file_url,
+          file_type,
+          expires_at,
+        }),
       });
-      if (!res.ok) throw new Error("Failed to save");
-      setLabSuccess("✅ Lab result uploaded successfully!");
-      setLabMrn(""); setLabName(""); setLabPhone("");
-      setLabTestName(""); setLabFile(null);
-    } catch (err) { setLabError("❌ " + err.message); }
+      const data = await res.json();
+      if (res.ok) {
+        setLabMsg("✅ Lab result uploaded successfully!");
+        setLabResults(p => [data.data, ...p]);
+        setLabForm({ mrn: "", patient_name: "", phone: "", test_name: "", expires_days: "30" });
+        setLabFile(null);
+      } else setLabMsg("❌ " + data.error);
+    } catch (err) { setLabMsg("❌ " + err.message); }
     setLabUploading(false);
   };
 
-  useEffect(() => {
-    if (loggedIn === "admin") fetchAppointments();
-  }, [loggedIn]);
-
-  const pendingList   = appointments.filter(a => a.status === "pending");
-  const confirmedList = appointments.filter(a => a.status === "confirmed");
-  const cancelledList = appointments.filter(a => a.status === "cancelled");
-  const displayed = activeTab === "pending" ? pendingList
-    : activeTab === "confirmed" ? confirmedList : cancelledList;
-
-  const tabStyle = (tab) => {
-    const colors = { pending: "#d97706", confirmed: "#16a34a", cancelled: "#dc2626" };
-    return {
-      padding: "12px 24px", border: "none",
-      borderBottom: activeTab === tab ? `3px solid ${colors[tab]}` : "3px solid transparent",
-      background: "white", color: activeTab === tab ? colors[tab] : "#6b7280",
-      fontWeight: activeTab === tab ? "700" : "400", fontSize: "15px", cursor: "pointer",
-    };
-  };
-
-  // ── Login Screen ──────────────────────────────────────
-  if (!loggedIn) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0fdf4" }}>
-        <div style={{ background: "white", padding: "40px", borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.1)", width: "100%", maxWidth: "400px" }}>
-          <h1 style={{ color: "#065f46", marginBottom: "8px", fontSize: "24px" }}>🏥 SMMH Portal</h1>
-          <p style={{ color: "#6b7280", marginBottom: "24px" }}>Enter your staff password</p>
-          <form onSubmit={handleLogin}>
-            <input type="password" placeholder="Enter password" value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1fae5", fontSize: "16px", marginBottom: "12px", boxSizing: "border-box" }} />
-            {error && <p style={{ color: "#dc2626", marginBottom: "12px" }}>{error}</p>}
-            <button type="submit" style={{ width: "100%", padding: "12px", background: "#065f46", color: "white", border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer" }}>
-              Login
-            </button>
-          </form>
-        </div>
+  // ── Login screen ─────────────────────────────────────────────────────────────
+  if (!authed) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f1f5f9" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 40, width: 340, boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
+        <h2 style={{ textAlign: "center", marginBottom: 24, color: "#1e3a5f" }}>SMMH Admin Portal</h2>
+        <input type="password" placeholder="Enter password" value={pw}
+          onChange={e => { setPw(e.target.value); setPwErr(""); }}
+          onKeyDown={e => e.key === "Enter" && login()}
+          style={{ width: "100%", padding: "10px 14px", border: "1px solid #d1d5db", borderRadius: 8, marginBottom: 12, fontSize: "0.95rem", boxSizing: "border-box" }}
+        />
+        {pwErr && <p style={{ color: "#dc2626", fontSize: "0.85rem", marginBottom: 8 }}>{pwErr}</p>}
+        <button onClick={login} style={{ width: "100%", ...btn("#1e3a5f"), padding: "11px", fontSize: "0.95rem" }}>
+          Login
+        </button>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ── LAB STAFF SCREEN (completely separate) ────────────
-  if (loggedIn === "lab") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f0f9ff", padding: "32px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
-          <div>
-            <h1 style={{ color: "#0369a1", fontSize: "28px", margin: 0 }}>🔬 Lab Results Portal</h1>
-            <p style={{ color: "#6b7280", margin: "4px 0 0" }}>Saiera Miraj Memorial Hospital</p>
-          </div>
-          <button onClick={() => setLoggedIn("")} style={{ padding: "8px 16px", background: "#dc2626", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            Logout
-          </button>
-        </div>
+  const TABS = role === "lab" ? LAB_TABS : ADMIN_TABS;
 
-        <div style={{ background: "white", borderRadius: "16px", padding: "40px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", maxWidth: "560px" }}>
-          <h3 style={{ color: "#0369a1", marginBottom: "24px", fontSize: "20px" }}>⬆️ Upload Lab Result</h3>
-          <form onSubmit={uploadLabResult}>
-            {[
-              { label: "MRN",          value: labMrn,      setter: setLabMrn,      placeholder: "SMMH-2024-00123" },
-              { label: "Patient Name", value: labName,     setter: setLabName,     placeholder: "Full name" },
-              { label: "Phone",        value: labPhone,    setter: setLabPhone,    placeholder: "03XX-XXXXXXX" },
-              { label: "Test Name",    value: labTestName, setter: setLabTestName, placeholder: "e.g. Blood Count, X-Ray" },
-            ].map(f => (
-              <div key={f.label} style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontWeight: "600", color: "#374151", marginBottom: "6px", fontSize: "13px" }}>{f.label} *</label>
-                <input value={f.value} onChange={e => f.setter(e.target.value)} placeholder={f.placeholder} required
-                  style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #bae6fd", fontSize: "15px", boxSizing: "border-box" }} />
-              </div>
-            ))}
-            <div style={{ marginBottom: "24px" }}>
-              <label style={{ display: "block", fontWeight: "600", color: "#374151", marginBottom: "6px", fontSize: "13px" }}>FILE (Image or PDF) *</label>
-              <input type="file" accept="image/*,.pdf" onChange={e => setLabFile(e.target.files[0])} required
-                style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #bae6fd", boxSizing: "border-box" }} />
-            </div>
-            {labError   && <p style={{ color: "#dc2626", marginBottom: "12px" }}>{labError}</p>}
-            {labSuccess && <p style={{ color: "#16a34a", marginBottom: "12px" }}>{labSuccess}</p>}
-            <button type="submit" disabled={labUploading} style={{ width: "100%", padding: "14px", background: "#0369a1", color: "white", border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer" }}>
-              {labUploading ? "Uploading..." : "⬆️ Upload Lab Result"}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const tabStyle = (t) => ({
+    padding: "10px 18px", border: "none", cursor: "pointer", fontWeight: 600,
+    fontSize: "0.85rem", borderRadius: "8px 8px 0 0",
+    background: tab === t ? "#fff" : "#e2e8f0",
+    color: tab === t ? "#1e3a5f" : "#64748b",
+    borderBottom: tab === t ? "2px solid #1e3a5f" : "2px solid transparent",
+  });
 
-  // ── ADMIN SCREEN ──────────────────────────────────────
+  const card       = { background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "14px 18px", marginBottom: 12, fontSize: "0.85rem" };
+  const label      = { fontWeight: 700, color: "#1e3a5f" };
+  const val        = { color: "#374151", marginLeft: 6 };
+  const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9rem", boxSizing: "border-box", marginBottom: 12 };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f0fdf4", padding: "32px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
-        <div>
-          <h1 style={{ color: "#065f46", fontSize: "28px", margin: 0 }}>🏥 Appointments Dashboard</h1>
-          <p style={{ color: "#6b7280", margin: "4px 0 0" }}>Saiera Miraj Memorial Hospital</p>
-        </div>
-        <div style={{ display: "flex", gap: "12px" }}>
-          <button onClick={fetchAppointments} style={{ padding: "8px 16px", background: "#e0f2fe", color: "#0369a1", border: "none", borderRadius: "8px", cursor: "pointer" }}>🔄 Refresh</button>
-          <button onClick={() => setLoggedIn("")} style={{ padding: "8px 16px", background: "#dc2626", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>Logout</button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px", maxWidth: "600px" }}>
-        {[
-          { label: "Pending",   count: pendingList.length,   color: "#d97706" },
-          { label: "Confirmed", count: confirmedList.length, color: "#16a34a" },
-          { label: "Cancelled", count: cancelledList.length, color: "#dc2626" },
-        ].map(s => (
-          <div key={s.label} style={{ background: "white", padding: "24px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", textAlign: "center", borderTop: `4px solid ${s.color}` }}>
-            <div style={{ fontSize: "36px", fontWeight: "bold", color: s.color }}>{s.count}</div>
-            <div style={{ color: "#6b7280", marginTop: "4px" }}>{s.label}</div>
-          </div>
-        ))}
+    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: "#1e3a5f", color: "#fff", padding: "16px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ margin: 0, fontSize: "1.2rem" }}>
+          SMMH {role === "lab" ? "Lab" : "Admin"} Dashboard
+        </h1>
+        <button onClick={() => { setAuthed(false); setPw(""); setRole(""); }} style={{ ...btn("#fff", "#1e3a5f"), padding: "7px 16px" }}>Logout</button>
       </div>
 
       {/* Tabs */}
-      <div style={{ background: "white", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-        <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-          <button style={tabStyle("pending")}   onClick={() => setActiveTab("pending")}>🕐 Pending ({pendingList.length})</button>
-          <button style={tabStyle("confirmed")} onClick={() => setActiveTab("confirmed")}>✅ Confirmed ({confirmedList.length})</button>
-          <button style={tabStyle("cancelled")} onClick={() => setActiveTab("cancelled")}>❌ Cancelled ({cancelledList.length})</button>
-        </div>
+      <div style={{ padding: "0 32px", background: "#e2e8f0", display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {TABS.map(t => (
+          <button key={t} style={tabStyle(t)} onClick={() => { setTab(t); setPostMsg(""); setLabMsg(""); }}>{t}</button>
+        ))}
+      </div>
 
-        {loading ? (
-          <p style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>Loading...</p>
-        ) : displayed.length === 0 ? (
-          <p style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>No {activeTab} appointments</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#065f46", color: "white" }}>
-                {["Patient", "Phone", "Email", "Department", "Date", "Notes", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: "14px" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayed.map((a, i) => (
-                <tr key={a.id} style={{ background: i % 2 === 0 ? "white" : "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                  <td style={{ padding: "12px 16px", fontWeight: "500" }}>{a.first_name} {a.last_name}</td>
-                  <td style={{ padding: "12px 16px" }}>{a.phone}</td>
-                  <td style={{ padding: "12px 16px", fontSize: "13px" }}>{a.email || "—"}</td>
-                  <td style={{ padding: "12px 16px" }}>{a.department}</td>
-                  <td style={{ padding: "12px 16px" }}>{a.preferred_date}</td>
-                  <td style={{ padding: "12px 16px", fontSize: "13px" }}>{a.notes || "—"}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      {activeTab === "pending" && <>
-                        <button onClick={() => updateStatus(a.id, "confirmed")} style={{ padding: "6px 14px", background: "#16a34a", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>✓ Confirm</button>
-                        <button onClick={() => updateStatus(a.id, "cancelled")} style={{ padding: "6px 14px", background: "#dc2626", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>✗ Cancel</button>
-                      </>}
-                      {activeTab === "confirmed" && <>
-                        <button onClick={() => updateStatus(a.id, "cancelled")} style={{ padding: "6px 14px", background: "#dc2626", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>✗ Cancel</button>
-                        <button onClick={() => updateStatus(a.id, "pending")}   style={{ padding: "6px 14px", background: "#d97706", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>↩ Pending</button>
-                      </>}
-                      {activeTab === "cancelled" && (
-                        <button onClick={() => updateStatus(a.id, "pending")} style={{ padding: "6px 14px", background: "#d97706", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>↩ Restore</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div style={{ padding: "28px 32px", maxWidth: 1000, margin: "0 auto" }}>
+        {loading && <p>Loading data...</p>}
+
+        {/* ── Appointments ── */}
+        {tab === "Appointments" && (
+          <>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Appointments ({appointments.length})</h2>
+            {appointments.length === 0 && <p style={{ color: "#6b7280" }}>No appointments yet.</p>}
+            {appointments.map(a => (
+              <div key={a.id} style={card}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={label}>{a.first_name} {a.last_name}</span>
+                    <span style={val}>— {a.department}</span>
+                    <span style={{ ...val, color: "#6b7280" }}> | {a.phone}</span>
+                    {a.email && <span style={{ ...val, color: "#6b7280" }}> | {a.email}</span>}
+                    <br />
+                    <span style={label}>Date:</span><span style={val}>{a.preferred_date}</span>
+                    {a.notes && <><br /><span style={label}>Notes:</span><span style={val}>{a.notes}</span></>}
+                    <br />
+                    <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 600 }}>{a.status}</span>
+                  </div>
+                  <button onClick={() => deleteRow("/api/appointments", a.id, setAppointments, appointments)} style={btn("#dc2626")}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Job Applications ── */}
+        {tab === "Job Applications" && (
+          <>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Job Applications ({applications.length})</h2>
+            {applications.length === 0 && <p style={{ color: "#6b7280" }}>No applications yet.</p>}
+            {applications.map(a => (
+              <div key={a.id} style={card}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={label}>{a.name}</span>
+                    <span style={val}>— {a.position}</span>
+                    <br />
+                    <span style={label}>Email:</span><span style={val}>{a.email}</span>
+                    <span style={{ ...val, color: "#6b7280" }}> | {a.phone}</span>
+                    {a.experience && <><br /><span style={label}>Experience:</span><span style={val}>{a.experience}</span></>}
+                    {a.cover_letter && <><br /><span style={label}>Cover Letter:</span><span style={val}>{a.cover_letter}</span></>}
+                    {a.cv_url && (
+                      <><br /><a href={a.cv_url} target="_blank" rel="noreferrer"
+                        style={{ color: "#0369a1", fontWeight: 600, fontSize: "0.82rem" }}>📄 View CV</a></>
+                    )}
+                    <br />
+                    <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 600 }}>{a.status}</span>
+                  </div>
+                  <button onClick={() => deleteRow("/api/careers", a.id, setApplications, applications)} style={btn("#dc2626")}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Contact Messages ── */}
+        {tab === "Contact Messages" && (
+          <>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Contact Messages ({messages.length})</h2>
+            {messages.length === 0 && <p style={{ color: "#6b7280" }}>No messages yet.</p>}
+            {messages.map(m => (
+              <div key={m.id} style={card}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={label}>{m.name}</span>
+                    <span style={val}>— {m.email}</span>
+                    {m.phone && <span style={{ ...val, color: "#6b7280" }}> | {m.phone}</span>}
+                    {m.subject && <><br /><span style={label}>Subject:</span><span style={val}>{m.subject}</span></>}
+                    <br /><span style={label}>Message:</span><span style={val}>{m.message}</span>
+                  </div>
+                  <button onClick={() => deleteRow("/api/contact", m.id, setMessages, messages)} style={btn("#dc2626")}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Job Postings ── */}
+        {tab === "Job Postings" && (
+          <>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 20 }}>Post a New Job</h2>
+            <form onSubmit={postJob} style={{ background: "#fff", borderRadius: 12, padding: 24, border: "1px solid #e5e7eb", marginBottom: 32 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Job Title *</label>
+                  <input style={inputStyle} value={jobForm.title} onChange={e => setJobForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Senior Nurse" required />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Department *</label>
+                  <input style={inputStyle} value={jobForm.department} onChange={e => setJobForm(p => ({ ...p, department: e.target.value }))} placeholder="e.g. ICU" required />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Type</label>
+                  <select style={inputStyle} value={jobForm.type} onChange={e => setJobForm(p => ({ ...p, type: e.target.value }))}>
+                    <option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Application Deadline</label>
+                  <input type="date" style={inputStyle} value={jobForm.deadline} onChange={e => setJobForm(p => ({ ...p, deadline: e.target.value }))} />
+                </div>
+              </div>
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Description *</label>
+              <textarea style={{ ...inputStyle, height: 80, resize: "vertical" }} value={jobForm.description}
+                onChange={e => setJobForm(p => ({ ...p, description: e.target.value }))} placeholder="Job description and requirements..." required />
+              {postMsg && <p style={{ color: postMsg.startsWith("✅") ? "#059669" : "#dc2626", marginBottom: 8 }}>{postMsg}</p>}
+              <button type="submit" disabled={posting} style={{ ...btn("#1e3a5f"), padding: "10px 24px" }}>
+                {posting ? "Posting..." : "Post Job"}
+              </button>
+            </form>
+
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Active Job Postings ({jobPostings.length})</h2>
+            {jobPostings.length === 0 && <p style={{ color: "#6b7280" }}>No job postings yet.</p>}
+            {jobPostings.map(j => (
+              <div key={j.id} style={card}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={label}>{j.title}</span>
+                    <span style={val}>— {j.department}</span>
+                    <span style={{ ...val, color: "#6b7280" }}> | {j.type}</span>
+                    {j.deadline && <span style={{ ...val, color: "#6b7280" }}> | Deadline: {j.deadline}</span>}
+                    <br /><span style={val}>{j.description}</span>
+                  </div>
+                  <button onClick={() => deleteRow("/api/job-postings", j.id, setJobPostings, jobPostings)} style={btn("#dc2626")}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Announcements ── */}
+        {tab === "Announcements" && (
+          <>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 20 }}>Post an Announcement</h2>
+            <form onSubmit={postNews} style={{ background: "#fff", borderRadius: 12, padding: 24, border: "1px solid #e5e7eb", marginBottom: 32 }}>
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Title *</label>
+              <input style={inputStyle} value={newsForm.title} onChange={e => setNewsForm(p => ({ ...p, title: e.target.value }))} placeholder="Announcement title" required />
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Description *</label>
+              <textarea style={{ ...inputStyle, height: 100, resize: "vertical" }} value={newsForm.description}
+                onChange={e => setNewsForm(p => ({ ...p, description: e.target.value }))} placeholder="Full announcement text..." required />
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Image / Poster (optional)</label>
+              <input type="file" accept="image/*" onChange={e => setNewsImage(e.target.files[0])} style={{ ...inputStyle, padding: "8px" }} />
+              {newsImage && <p style={{ fontSize: "0.8rem", color: "#059669", marginBottom: 8 }}>✓ {newsImage.name}</p>}
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Or paste image URL</label>
+              <input style={inputStyle} value={newsForm.image_url} onChange={e => setNewsForm(p => ({ ...p, image_url: e.target.value }))} placeholder="https://..." />
+              {postMsg && <p style={{ color: postMsg.startsWith("✅") ? "#059669" : "#dc2626", marginBottom: 8 }}>{postMsg}</p>}
+              <button type="submit" disabled={posting} style={{ ...btn("#1e3a5f"), padding: "10px 24px" }}>
+                {posting ? "Posting..." : "Post Announcement"}
+              </button>
+            </form>
+
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Live Announcements ({announcements.length})</h2>
+            {announcements.length === 0 && <p style={{ color: "#6b7280" }}>No announcements yet.</p>}
+            {announcements.map(n => (
+              <div key={n.id} style={card}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={label}>{n.title}</span>
+                    {n.image_url && (
+                      <><br /><img src={n.image_url} alt="" style={{ maxWidth: 120, maxHeight: 80, borderRadius: 6, marginTop: 6, objectFit: "cover" }} /></>
+                    )}
+                    <br /><span style={val}>{n.description}</span>
+                  </div>
+                  <button onClick={() => deleteRow("/api/news", n.id, setAnnouncements, announcements)} style={btn("#dc2626")}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── Lab Results ── */}
+        {tab === "Lab Results" && (
+          <>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 20 }}>Upload Lab Result</h2>
+            <form onSubmit={submitLabResult} style={{ background: "#fff", borderRadius: 12, padding: 24, border: "1px solid #e5e7eb", marginBottom: 32 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Patient MRN *</label>
+                  <input style={inputStyle} value={labForm.mrn} onChange={e => setLabForm(p => ({ ...p, mrn: e.target.value }))}
+                    placeholder="e.g. SMMH-2024-00123" required />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Patient Name *</label>
+                  <input style={inputStyle} value={labForm.patient_name} onChange={e => setLabForm(p => ({ ...p, patient_name: e.target.value }))}
+                    placeholder="Full name" required />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Phone *</label>
+                  <input style={inputStyle} value={labForm.phone} onChange={e => setLabForm(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="03XX-XXXXXXX" required />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Test Name *</label>
+                  <input style={inputStyle} value={labForm.test_name} onChange={e => setLabForm(p => ({ ...p, test_name: e.target.value }))}
+                    placeholder="e.g. CBC, LFTs, X-Ray" required />
+                </div>
+              </div>
+
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Result Expires After</label>
+              <select style={{ ...inputStyle, width: "auto", marginBottom: 16 }} value={labForm.expires_days}
+                onChange={e => setLabForm(p => ({ ...p, expires_days: e.target.value }))}>
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+                <option value="60">60 days</option>
+                <option value="90">90 days</option>
+              </select>
+
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: 4 }}>Upload File (PDF / Image) *</label>
+              <input type="file" accept=".pdf,image/*"
+                onChange={e => setLabFile(e.target.files[0])}
+                style={{ ...inputStyle, padding: "8px" }}
+              />
+              {labFile && <p style={{ fontSize: "0.8rem", color: "#059669", marginBottom: 8 }}>✓ {labFile.name}</p>}
+
+              {labMsg && <p style={{ color: labMsg.startsWith("✅") ? "#059669" : "#dc2626", marginBottom: 8 }}>{labMsg}</p>}
+              <button type="submit" disabled={labUploading} style={{ ...btn("#0d9488"), padding: "10px 24px" }}>
+                {labUploading ? "Uploading..." : "Upload Result"}
+              </button>
+            </form>
+
+            {/* Uploaded results list */}
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>
+              Uploaded Results ({labResults.length})
+            </h2>
+            {labLoading && <p>Loading...</p>}
+            {!labLoading && labResults.length === 0 && <p style={{ color: "#6b7280" }}>No lab results uploaded yet.</p>}
+            {labResults.map(r => (
+              <div key={r.id} style={card}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <span style={label}>{r.patient_name}</span>
+                    <span style={{ ...val, color: "#6b7280" }}> | MRN: {r.mrn}</span>
+                    <span style={{ ...val, color: "#6b7280" }}> | {r.phone}</span>
+                    <br />
+                    <span style={label}>Test:</span><span style={val}>{r.test_name}</span>
+                    <br />
+                    <span style={label}>Uploaded:</span>
+                    <span style={val}>{new Date(r.uploaded_at).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })}</span>
+                    <span style={{ ...val, color: "#6b7280" }}> | Expires: {new Date(r.expires_at).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })}</span>
+                    <br />
+                    <a href={r.file_url} target="_blank" rel="noreferrer"
+                      style={{ color: "#0369a1", fontWeight: 600, fontSize: "0.82rem" }}>
+                      {r.file_type?.includes("pdf") ? "📄 View PDF" : "🖼️ View Image"}
+                    </a>
+                  </div>
+                  <button onClick={() => deleteRow("/api/lab-results", r.id, setLabResults, labResults)} style={btn("#dc2626")}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </>
         )}
       </div>
     </div>

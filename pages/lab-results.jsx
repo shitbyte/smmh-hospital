@@ -1,121 +1,136 @@
-
+// pages/lab-results.jsx  ── Lab Results Online
 import { useState } from "react";
-import Head from "next/head";
+import Layout from "../components/Layout";
 
-export default function LabResults() {
-  const [mrn, setMrn]     = useState("");
-  const [phone, setPhone] = useState("");
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+export default function LabResultsPage() {
+  const [mrn, setMrn]         = useState("");
   const [searched, setSearched] = useState(false);
+  const [results, setResults]   = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    setError(""); setLoading(true); setSearched(false);
+    setLoading(true);
+    setError("");
+    setResults([]);
+    setSearched(false);
+
     try {
-      const res = await fetch(`/api/lab-results?mrn=${mrn}&phone=${phone}`);
+      const res  = await fetch(`/api/lab-results?mrn=${encodeURIComponent(mrn.trim())}`);
       const data = await res.json();
-      if (!res.ok) { setError(data.error); }
-      else { setResults(data.results); setSearched(true); }
-    } catch { setError("Network error. Please try again."); }
-    setLoading(false);
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setResults(data.data || []);
+      setSearched(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <>
-      <Head><title>Lab Results - SMMH</title></Head>
-      <div style={{ minHeight: "100vh", background: "#f0fdf4", padding: "40px 20px" }}>
-        <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+    <Layout title="Lab Results" description="Access your lab and diagnostic results online at SMMH.">
+      <div style={{ background: "linear-gradient(135deg, var(--navy), #0a3d3d)", padding: "80px 0 60px", textAlign: "center", color: "white" }}>
+        <div className="container">
+          <span className="section-label" style={{ color: "var(--gold-light)", background: "rgba(201,168,76,0.15)" }}>Diagnostics</span>
+          <h1 className="section-title" style={{ color: "white", marginTop: 12 }}>Lab Results Online</h1>
+          <p style={{ color: "#94afc8", maxWidth: 540, margin: "0 auto", fontSize: "1.05rem", lineHeight: 1.75 }}>
+            Access your diagnostic and laboratory reports securely using your Patient MRN.
+          </p>
+        </div>
+      </div>
 
-          {/* Search Form */}
-          <div style={{ background: "white", borderRadius: "16px", padding: "40px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", marginBottom: "32px" }}>
-            <h2 style={{ color: "#065f46", fontSize: "24px", marginBottom: "8px" }}>🔬 Access Your Lab Results</h2>
-            <p style={{ color: "#6b7280", marginBottom: "28px" }}>Enter your Medical Record Number and registered phone number</p>
+      <section className="section">
+        <div className="container" style={{ maxWidth: 540 }}>
+          <div className="card" style={{ padding: "40px 36px" }}>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--navy)", marginBottom: 8 }}>Access Your Reports</h2>
+            <p style={{ color: "var(--gray)", marginBottom: 28, fontSize: "0.9rem", lineHeight: 1.7 }}>
+              Enter your Medical Record Number (MRN) to view your lab results.
+              Your MRN can be found on your patient card or discharge summary.
+            </p>
 
             <form onSubmit={handleSearch}>
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontWeight: "600", color: "#374151", marginBottom: "6px", fontSize: "13px", letterSpacing: "0.05em" }}>
-                  MEDICAL RECORD NUMBER (MRN) *
-                </label>
+              <div style={{ marginBottom: 24 }}>
+                <label className="form-label">Medical Record Number (MRN) *</label>
                 <input
-                  type="text" value={mrn} onChange={e => setMrn(e.target.value)}
-                  placeholder="e.g. SMMH-2024-00123" required
-                  style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1fae5", fontSize: "15px", boxSizing: "border-box" }}
+                  className="form-input"
+                  placeholder="e.g. SMMH-2024-00123"
+                  value={mrn}
+                  onChange={(e) => setMrn(e.target.value)}
+                  required
                 />
               </div>
-              <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", fontWeight: "600", color: "#374151", marginBottom: "6px", fontSize: "13px", letterSpacing: "0.05em" }}>
-                  PHONE NUMBER *
-                </label>
-                <input
-                  type="text" value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="03XX-XXXXXXX" required
-                  style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1fae5", fontSize: "15px", boxSizing: "border-box" }}
-                />
-              </div>
-              {error && <p style={{ color: "#dc2626", marginBottom: "16px" }}>⚠️ {error}</p>}
-              <button type="submit" disabled={loading} style={{
-                width: "100%", padding: "14px", background: "#065f46", color: "white",
-                border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer"
-              }}>
-                {loading ? "Searching..." : "🔍 Search Results"}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ width: "100%", padding: "13px", background: "var(--teal)", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? "Searching..." : "Search Results"}
               </button>
             </form>
-          </div>
 
-          {/* Results */}
-          {searched && (
-            results.length === 0 ? (
-              <div style={{ background: "white", borderRadius: "16px", padding: "40px", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-                <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
-                <h3 style={{ color: "#374151" }}>No results found</h3>
-                <p style={{ color: "#6b7280" }}>No lab results found for this MRN and phone number, or results may have expired.</p>
+            {/* Error */}
+            {error && (
+              <div style={{ marginTop: 20, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 18px" }}>
+                <p style={{ color: "#991b1b", fontWeight: 600, margin: 0 }}>⚠️ {error}</p>
               </div>
-            ) : (
-              <div>
-                <h3 style={{ color: "#065f46", marginBottom: "16px" }}>
-                  Found {results.length} result{results.length > 1 ? "s" : ""} for {results[0]?.patient_name}
+            )}
+
+            {/* No results */}
+            {searched && results.length === 0 && !error && (
+              <div style={{ marginTop: 24, background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "18px 20px", textAlign: "center" }}>
+                <p style={{ color: "#0369a1", fontWeight: 600, marginBottom: 6 }}>No results found for this MRN.</p>
+                <p style={{ color: "#0284c7", fontSize: "0.88rem" }}>
+                  Please double-check your MRN, or call us at{" "}
+                  <a href="tel:04211178678" style={{ fontWeight: 700 }}>(042) 111 786 786</a> for assistance.
+                </p>
+              </div>
+            )}
+
+            {/* Results list */}
+            {results.length > 0 && (
+              <div style={{ marginTop: 28 }}>
+                <h3 style={{ color: "var(--navy)", fontSize: "1rem", fontWeight: 700, marginBottom: 14 }}>
+                  {results.length} Result{results.length > 1 ? "s" : ""} Found
                 </h3>
                 {results.map((r) => (
                   <div key={r.id} style={{
-                    background: "white", borderRadius: "12px", padding: "24px",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", marginBottom: "16px",
-                    borderLeft: "4px solid #065f46"
+                    border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 20px",
+                    marginBottom: 12, background: "#f8fafc"
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                      <div>
-                        <h4 style={{ margin: 0, color: "#065f46", fontSize: "18px" }}>🧪 {r.test_name}</h4>
-                        <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "13px" }}>
-                          Uploaded: {new Date(r.uploaded_at).toLocaleDateString()} &nbsp;|&nbsp;
-                          Expires: {new Date(r.expires_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <a href={r.file_url} target="_blank" rel="noreferrer" style={{
-                        padding: "8px 16px", background: "#065f46", color: "white",
-                        borderRadius: "8px", textDecoration: "none", fontSize: "13px"
-                      }}>
-                        {r.file_type === "pdf" ? "📄 View PDF" : "🖼️ View Image"}
-                      </a>
-                    </div>
-                    {r.file_type !== "pdf" && (
-                      <img src={r.file_url} alt={r.test_name}
-                        style={{ width: "100%", borderRadius: "8px", border: "1px solid #e5e7eb" }} />
-                    )}
+                    <p style={{ fontWeight: 700, color: "var(--navy)", marginBottom: 4 }}>{r.test_name}</p>
+                    <p style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 10 }}>
+                      Uploaded: {new Date(r.uploaded_at).toLocaleDateString("en-PK", { year: "numeric", month: "long", day: "numeric" })}
+                      {" · "}
+                      Expires: {new Date(r.expires_at).toLocaleDateString("en-PK", { year: "numeric", month: "long", day: "numeric" })}
+                    </p>
+                    <a
+                      href={r.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-block", background: "var(--teal)", color: "#fff",
+                        padding: "8px 18px", borderRadius: 8, fontWeight: 600,
+                        fontSize: "0.88rem", textDecoration: "none"
+                      }}
+                    >
+                      {r.file_type?.includes("pdf") ? "📄 Download PDF" : "🖼️ View Image"}
+                    </a>
                   </div>
                 ))}
               </div>
-            )
-          )}
+            )}
+          </div>
 
-          {/* Privacy Note */}
-          <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: "12px", padding: "16px", marginTop: "24px" }}>
-            <p style={{ margin: 0, color: "#92400e", fontSize: "13px" }}>
-              🔒 <strong>Privacy Note:</strong> Your medical reports are confidential. Results are only accessible with your unique MRN and phone number. Reports are automatically deleted after 30 days.
+          <div style={{ marginTop: 24, padding: "20px 24px", background: "#fff7ed", borderRadius: 12, borderLeft: "4px solid #f59e0b" }}>
+            <p style={{ margin: 0, color: "#92400e", fontSize: "0.88rem", lineHeight: 1.7 }}>
+              <strong>🔒 Privacy Note:</strong> Your medical reports are confidential and accessible only with your unique MRN.
+              Results automatically expire after their validity period. For help, contact our diagnostic lab at ext. 302.
             </p>
           </div>
         </div>
-      </div>
-    </>
+      </section>
+    </Layout>
   );
 }
