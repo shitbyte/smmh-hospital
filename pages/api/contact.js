@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { useState } from "react";
 
 export default function Contact() {
