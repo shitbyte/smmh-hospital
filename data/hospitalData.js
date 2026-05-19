@@ -167,36 +167,12 @@ export const DOCTORS = [
 ];
 
 export const WHY_US = [
-  {
-    num: "01",
-    title: "Expert Medical Team",
-    desc: "Over 120 highly qualified consultants and specialists with national and international training credentials.",
-  },
-  {
-    num: "02",
-    title: "Advanced Technology",
-    desc: "Equipped with the latest in medical imaging, minimally invasive surgical tools, and ICU monitoring systems.",
-  },
-  {
-    num: "03",
-    title: "Patient-Centred Care",
-    desc: "Every treatment plan is personalised, with dedicated care coordinators ensuring a smooth journey.",
-  },
-  {
-    num: "04",
-    title: "24/7 Availability",
-    desc: "Our emergency services, pharmacy, and helpline operate continuously — help is always just a call away.",
-  },
-  {
-    num: "05",
-    title: "Insurance Coverage",
-    desc: "Registered with all major insurance panels ensuring hassle-free cashless treatment for eligible patients.",
-  },
-  {
-    num: "06",
-    title: "Accredited Excellence",
-    desc: "JCI and ISO accredited, with a proven track record of meeting the highest patient safety benchmarks.",
-  },
+  { num: "01", color: "#0d9488", title: "Expert Medical Team",  desc: "Over 120 highly qualified consultants and specialists with national and international training credentials." },
+  { num: "02", color: "#2563eb", title: "Advanced Technology",  desc: "Equipped with the latest in medical imaging, minimally invasive surgical tools, and ICU monitoring systems." },
+  { num: "03", color: "#7c3aed", title: "Patient-Centred Care", desc: "Every treatment plan is personalised, with dedicated care coordinators ensuring a smooth journey." },
+  { num: "04", color: "#dc2626", title: "24/7 Availability",    desc: "Our emergency services, pharmacy, and helpline operate continuously — help is always just a call away." },
+  { num: "05", color: "#d97706", title: "Insurance Coverage",   desc: "Registered with all major insurance panels ensuring hassle-free cashless treatment for eligible patients." },
+  { num: "06", color: "#059669", title: "Accredited Excellence",desc: "JCI and ISO accredited, with a proven track record of meeting the highest patient safety benchmarks." },
 ];
 
 export const NAV_LINKS = [
@@ -252,35 +228,35 @@ export const TESTIMONIALS = [
     id: 1,
     name: "Mr. Arslan Haider",
     location: "Lahore",
-    rating: 5,
+    rating: 4.9,
     quote: "Exceptional care and attentive staff. Highly recommend! I had a wonderful experience at this hospital. The nurses were incredibly supportive, and the doctors took the time to explain everything clearly.",
   },
   {
     id: 2,
     name: "Ms. Nida Anwar",
     location: "Lahore",
-    rating: 5,
+    rating: 4.9,
     quote: "Clean facilities and compassionate service! The hospital was spotless, and every staff member I encountered was kind and professional. They made my stay comfortable during a challenging time.",
   },
   {
     id: 3,
     name: "Mr. M Asfand Yar",
     location: "Sialkot",
-    rating: 5,
+    rating: 4.9,
     quote: "Efficient and friendly staff made all the difference. From admission to discharge, I felt cared for and respected. The quick response time during my emergency was impressive!",
   },
   {
     id: 4,
     name: "Ms. Amna Umer",
     location: "Lahore",
-    rating: 5,
+    rating: 4.9,
     quote: "Life-changing treatment with a personal touch. I received excellent care for my condition. The doctors were thorough and genuinely concerned about my well-being.",
   },
   {
     id: 5,
     name: "Mr. Saeed Iqbal",
     location: "Sheikhupura",
-    rating: 5,
+    rating: 4.9,
     quote: "Top-notch hospital with a focus on patients. This hospital exceeded my expectations! The entire team worked together seamlessly throughout my entire treatment journey.",
   },
 ];

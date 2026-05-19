@@ -4,7 +4,7 @@ import Link from "next/link";
 import s from "../styles/Sections.module.css";
 import { DOCTORS, TESTIMONIALS, WHY_US, HOSPITAL } from "../data/hospitalData";
 import AppointmentForm from "./AppointmentForm";
-import { CheckCircleIcon, PhoneIcon, EmailIcon, LocationIcon, CalendarIcon } from "./Icons";
+import { CheckCircleIcon, PhoneIcon, EmailIcon, LocationIcon } from "./Icons";
 
 /* ─── Appointment Section ───────────────────────────────────────────────── */
 export function AppointmentSection() {
@@ -31,7 +31,6 @@ export function AppointmentSection() {
               ))}
             </div>
           </div>
-
           <AppointmentForm />
         </div>
       </div>
@@ -60,7 +59,22 @@ export function DoctorsSection() {
                 className={s.doctorPhoto}
                 style={{ background: `linear-gradient(135deg, ${doc.color[0]}, ${doc.color[1]})` }}
               >
-                <span className={s.doctorInitial}>{doc.initials}</span>
+                {doc.image ? (
+                  <img
+                    src={doc.image}
+                    alt={doc.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      objectPosition: "top",
+                      display: "block",
+                    }}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                ) : (
+                  <span className={s.doctorInitial}>{doc.initials}</span>
+                )}
               </div>
               <div className={s.doctorInfo}>
                 <h3>{doc.name}</h3>
@@ -103,8 +117,9 @@ export function WhyUsSection() {
 
         <div className={s.whyGrid}>
           {WHY_US.map((item) => (
-            <div key={item.num} className={`${s.whyCard} reveal`}>
-              <div className={s.whyNum}>{item.num}</div>
+            <div key={item.num} className={`${s.whyCard} reveal`}
+              style={{ borderTop: `4px solid ${item.color}`, background: "white" }}>
+              <div className={s.whyNum} style={{ color: item.color }}>{item.num}</div>
               <h3 className={s.whyTitle}>{item.title}</h3>
               <p className={s.whyDesc}>{item.desc}</p>
             </div>
@@ -133,12 +148,12 @@ export function TestimonialsSection() {
             <div key={t.id} className={`${s.testiCard} reveal`}>
               <div className={s.stars}>{"★".repeat(t.rating)}</div>
               <div className={s.testiQuote}>&ldquo;</div>
-              <p className={s.testiText}>{t.text}</p>
+              <p className={s.testiText}>{t.quote}</p>
               <div className={s.testiAuthor}>
-                <div className={s.testiAvatar}>{t.initials}</div>
+                <div className={s.testiAvatar}>{t.name.charAt(t.name.lastIndexOf(" ") + 1)}</div>
                 <div>
                   <div className={s.testiName}>{t.name}</div>
-                  <div className={s.testiRole}>{t.role}</div>
+                  <div className={s.testiRole}>{t.location}</div>
                 </div>
               </div>
             </div>
@@ -168,7 +183,7 @@ const contactItems = [
     ),
     title: "Emergency",
     lines: [
-      { text: "1122 – Rescue",        href: "tel:1122",            style: { color: "#dc2626", fontWeight: 700 } },
+      { text: "1122 – Rescue",                 href: "tel:1122",                                    style: { color: "#dc2626", fontWeight: 700 } },
       { text: `Direct: ${HOSPITAL.emergency}`, href: `tel:${HOSPITAL.emergency.replace(/\D/g,"")}` },
     ],
     emergency: true,
@@ -177,8 +192,8 @@ const contactItems = [
     Icon: EmailIcon,
     title: "Email",
     lines: [
-      { text: HOSPITAL.email,      href: `mailto:${HOSPITAL.email}` },
-      { text: HOSPITAL.emailAppt,  href: `mailto:${HOSPITAL.emailAppt}` },
+      { text: HOSPITAL.email,     href: `mailto:${HOSPITAL.email}` },
+      { text: HOSPITAL.emailAppt, href: `mailto:${HOSPITAL.emailAppt}` },
     ],
     emergency: false,
   },
@@ -227,7 +242,7 @@ export function ContactSection() {
             ))}
           </div>
 
-         {/* Google Map */}
+          {/* Google Map */}
           <iframe
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d13591.14671620622!2d74.24334699843983!3d31.61230454745414!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39191db3a43e14a7%3A0x9684836f3763f63f!2sSaira%20Miraj%20Memorial%20Hospital!5e0!3m2!1sen!2s!4v1779158785020!5m2!1sen!2s"
             width="100%"

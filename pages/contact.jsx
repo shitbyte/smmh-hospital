@@ -124,11 +124,6 @@ export default function ContactPage() {
             referrerPolicy="no-referrer-when-downgrade"
           />
           
-            href="https://maps.google.com/?q=Saira+Miraj+Memorial+Hospital+Lahore"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ display:"block", textAlign:"center", marginTop:12, color:"var(--teal)", fontWeight:600, fontSize:"0.9rem" }}
-          
  </div>
       </section>
       <AppointmentSection />
