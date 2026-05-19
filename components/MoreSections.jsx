@@ -1,5 +1,6 @@
 // components/MoreSections.jsx
-// ─── Appointment · Doctors · WhyUs · Testimonials · Contact ───────────────
+// ─── Appointment · Doctors · WhyUs · Testimonials · News · Contact ────────
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import s from "../styles/Sections.module.css";
 import { DOCTORS, TESTIMONIALS, WHY_US, HOSPITAL } from "../data/hospitalData";
@@ -159,6 +160,117 @@ export function TestimonialsSection() {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── News & Announcements Section ─────────────────────────────────────── */
+export function NewsSection() {
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/news")
+      .then(r => r.json())
+      .then(d => setNews(d.data || []))
+      .catch(() => setNews([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (!loading && news.length === 0) return null;
+
+  return (
+    <section className="section" id="news" style={{ background: "#f8fafc" }}>
+      <div className="container">
+        <div className="section-header" style={{ textAlign: "center", marginBottom: 56 }}>
+          <span className="section-label">Latest Updates</span>
+          <h2 className="section-title">News &amp; Announcements</h2>
+          <p className="section-desc" style={{ maxWidth: 520, margin: "0 auto" }}>
+            Stay informed with the latest news, events, and announcements from
+            Saiera Miraj Memorial Hospital.
+          </p>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280" }}>
+            Loading announcements...
+          </div>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+            gap: 28,
+          }}>
+            {news.map((item) => (
+              <div key={item.id} className="reveal" style={{
+                background: "#fff",
+                borderRadius: 14,
+                overflow: "hidden",
+                boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
+                border: "1px solid #e5e7eb",
+                display: "flex",
+                flexDirection: "column",
+                transition: "transform 0.2s, box-shadow 0.2s",
+              }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.12)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 2px 16px rgba(0,0,0,0.07)";
+                }}
+              >
+                {/* Image */}
+                {item.image_url && (
+                  <div style={{ height: 180, overflow: "hidden" }}>
+                    <img
+                      src={item.image_url}
+                      alt={item.title}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={e => { e.target.parentElement.style.display = "none"; }}
+                    />
+                  </div>
+                )}
+
+                {/* Content */}
+                <div style={{ padding: "20px 22px", flex: 1, display: "flex", flexDirection: "column" }}>
+                  {/* Date badge */}
+                  <span style={{
+                    fontSize: "0.75rem", fontWeight: 600, color: "#0d9488",
+                    textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8,
+                  }}>
+                    {new Date(item.created_at).toLocaleDateString("en-PK", {
+                      day: "numeric", month: "long", year: "numeric"
+                    })}
+                  </span>
+
+                  <h3 style={{
+                    fontSize: "1rem", fontWeight: 700, color: "#1e3a5f",
+                    marginBottom: 10, lineHeight: 1.4,
+                  }}>
+                    {item.title}
+                  </h3>
+
+                  <p style={{
+                    fontSize: "0.88rem", color: "#6b7280", lineHeight: 1.6,
+                    flex: 1,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}>
+                    {item.description}
+                  </p>
+                </div>
+
+                {/* Bottom accent */}
+                <div style={{ height: 3, background: "linear-gradient(90deg, #1e3a5f, #0d9488)" }} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

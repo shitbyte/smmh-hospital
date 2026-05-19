@@ -2,7 +2,7 @@
 import Layout from "../components/Layout";
 import Hero from "../components/Hero";
 import { QuickAccess, ServicesSection, AboutSection, DepartmentsSection } from "../components/Sections";
-import { AppointmentSection, DoctorsSection, WhyUsSection, TestimonialsSection, ContactSection } from "../components/MoreSections";
+import { AppointmentSection, DoctorsSection, WhyUsSection, TestimonialsSection, NewsSection, ContactSection } from "../components/MoreSections";
 
 export default function HomePage() {
   return (
@@ -16,6 +16,7 @@ export default function HomePage() {
       <DoctorsSection />
       <WhyUsSection />
       <TestimonialsSection />
+      <NewsSection />
       <ContactSection />
     </Layout>
   );
