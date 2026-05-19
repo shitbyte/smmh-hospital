@@ -23,6 +23,19 @@ export default async function handler(req, res) {
     return res.status(200).json({ data });
   }
 
+  // PATCH — update status (confirm / reject)
+  if (req.method === "PATCH") {
+    const { id, status } = req.body;
+    if (!id || !status) return res.status(400).json({ error: "ID and status required." });
+    const { data, error } = await supabase
+      .from("appointments")
+      .update({ status })
+      .eq("id", id)
+      .select();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ data });
+  }
+
   // DELETE
   if (req.method === "DELETE") {
     const { id } = req.body;

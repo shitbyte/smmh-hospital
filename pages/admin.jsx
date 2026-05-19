@@ -12,6 +12,74 @@ const btn = (bg, color = "#fff") => ({
   padding: "6px 14px", fontWeight: 600, cursor: "pointer", fontSize: "0.82rem",
 });
 
+// ── Appointment Detail Modal ────────────────────────────────────────────────
+function AppointmentModal({ appt, onClose, onAccept, onReject, onDelete }) {
+  if (!appt) return null;
+  const isPending = appt.status === "pending";
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: 32, width: 480, maxWidth: "90vw",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.18)", position: "relative"
+      }}>
+        {/* Close */}
+        <button onClick={onClose} style={{
+          position: "absolute", top: 14, right: 16, background: "none", border: "none",
+          fontSize: "1.4rem", cursor: "pointer", color: "#6b7280"
+        }}>×</button>
+
+        <h3 style={{ color: "#1e3a5f", marginBottom: 20, fontSize: "1.1rem" }}>Appointment Details</h3>
+
+        {/* Status badge */}
+        <div style={{ marginBottom: 16 }}>
+          <span style={{
+            padding: "4px 12px", borderRadius: 20, fontSize: "0.78rem", fontWeight: 700,
+            background: appt.status === "confirmed" ? "#d1fae5" : appt.status === "rejected" ? "#fee2e2" : "#fef3c7",
+            color: appt.status === "confirmed" ? "#065f46" : appt.status === "rejected" ? "#991b1b" : "#92400e",
+          }}>{appt.status?.toUpperCase()}</span>
+        </div>
+
+        {/* Fields */}
+        {[
+          ["Patient", `${appt.first_name} ${appt.last_name}`],
+          ["Department", appt.department],
+          ["Date", appt.preferred_date],
+          ["Time", appt.preferred_time || "—"],
+          ["Phone", appt.phone],
+          ["Email", appt.email || "—"],
+          ["Notes", appt.notes || "—"],
+          ["Submitted", appt.created_at ? new Date(appt.created_at).toLocaleString("en-PK") : "—"],
+        ].map(([lbl, val]) => (
+          <div key={lbl} style={{ display: "flex", marginBottom: 10, fontSize: "0.88rem" }}>
+            <span style={{ fontWeight: 700, color: "#1e3a5f", width: 100, flexShrink: 0 }}>{lbl}</span>
+            <span style={{ color: "#374151" }}>{val}</span>
+          </div>
+        ))}
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
+          {isPending && (
+            <>
+              <button onClick={() => { onAccept(appt); onClose(); }}
+                style={{ ...btn("#059669"), padding: "8px 20px" }}>✓ Accept</button>
+              <button onClick={() => { onReject(appt); onClose(); }}
+                style={{ ...btn("#dc2626"), padding: "8px 20px" }}>✕ Reject</button>
+            </>
+          )}
+          <button onClick={() => { onDelete(appt); onClose(); }}
+            style={{ ...btn("#6b7280"), padding: "8px 20px" }}>🗑 Delete</button>
+          <button onClick={onClose}
+            style={{ ...btn("#e2e8f0", "#374151"), padding: "8px 20px" }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [authed, setAuthed]   = useState(false);
   const [role, setRole]       = useState("");
@@ -27,6 +95,10 @@ export default function AdminDashboard() {
   const [jobPostings, setJobPostings]     = useState([]);
   const [announcements, setAnnouncements] = useState([]);
 
+  // Appointment sub-tab & modal
+  const [apptTab, setApptTab]       = useState("pending");
+  const [modalAppt, setModalAppt]   = useState(null);
+
   // Admin form states
   const [jobForm, setJobForm] = useState({ title: "", department: "", type: "Full-time", description: "", deadline: "" });
   const [newsForm, setNewsForm] = useState({ title: "", description: "", image_url: "" });
@@ -35,12 +107,12 @@ export default function AdminDashboard() {
   const [postMsg, setPostMsg] = useState("");
 
   // Lab states
-  const [labResults, setLabResults]   = useState([]);
-  const [labLoading, setLabLoading]   = useState(false);
-  const [labFile, setLabFile]         = useState(null);
+  const [labResults, setLabResults]     = useState([]);
+  const [labLoading, setLabLoading]     = useState(false);
+  const [labFile, setLabFile]           = useState(null);
   const [labUploading, setLabUploading] = useState(false);
-  const [labMsg, setLabMsg]           = useState("");
-  const [labForm, setLabForm]         = useState({
+  const [labMsg, setLabMsg]             = useState("");
+  const [labForm, setLabForm]           = useState({
     mrn: "", patient_name: "", phone: "", test_name: "", expires_days: "30"
   });
 
@@ -90,6 +162,24 @@ export default function AdminDashboard() {
     if (!confirm("Delete this record?")) return;
     await fetch(endpoint, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
     setter(list.filter(r => r.id !== id));
+  };
+
+  // ── Update appointment status ───────────────────────────────────────────────
+  const updateApptStatus = async (appt, newStatus) => {
+    try {
+      await fetch("/api/appointments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: appt.id, status: newStatus }),
+      });
+      setAppointments(prev =>
+        prev.map(a => a.id === appt.id ? { ...a, status: newStatus } : a)
+      );
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteAppt = (appt) => {
+    deleteRow("/api/appointments", appt.id, setAppointments, appointments);
   };
 
   // ── Upload image for announcements ──────────────────────────────────────────
@@ -223,13 +313,53 @@ export default function AdminDashboard() {
     borderBottom: tab === t ? "2px solid #1e3a5f" : "2px solid transparent",
   });
 
+  // Appointment sub-tab style
+  const apptSubTabStyle = (t) => ({
+    padding: "7px 18px", border: "none", cursor: "pointer", fontWeight: 600,
+    fontSize: "0.82rem", borderRadius: 20,
+    background: apptTab === t
+      ? (t === "pending" ? "#fef3c7" : t === "confirmed" ? "#d1fae5" : "#fee2e2")
+      : "#f1f5f9",
+    color: apptTab === t
+      ? (t === "pending" ? "#92400e" : t === "confirmed" ? "#065f46" : "#991b1b")
+      : "#64748b",
+    fontWeight: apptTab === t ? 700 : 500,
+  });
+
   const card       = { background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "14px 18px", marginBottom: 12, fontSize: "0.85rem" };
   const label      = { fontWeight: 700, color: "#1e3a5f" };
   const val        = { color: "#374151", marginLeft: 6 };
   const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9rem", boxSizing: "border-box", marginBottom: 12 };
 
+  // Filtered appointments by sub-tab
+  const filteredAppts = appointments.filter(a => a.status === apptTab);
+
+  const statusBadge = (status) => {
+    const styles = {
+      pending:   { background: "#fef3c7", color: "#92400e" },
+      confirmed: { background: "#d1fae5", color: "#065f46" },
+      rejected:  { background: "#fee2e2", color: "#991b1b" },
+    };
+    return {
+      ...styles[status] || { background: "#f3f4f6", color: "#374151" },
+      padding: "2px 10px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 700,
+    };
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
+
+      {/* Modal */}
+      {modalAppt && (
+        <AppointmentModal
+          appt={modalAppt}
+          onClose={() => setModalAppt(null)}
+          onAccept={(a) => updateApptStatus(a, "confirmed")}
+          onReject={(a) => updateApptStatus(a, "rejected")}
+          onDelete={deleteAppt}
+        />
+      )}
+
       {/* Header */}
       <div style={{ background: "#1e3a5f", color: "#fff", padding: "16px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ margin: 0, fontSize: "1.2rem" }}>
@@ -251,11 +381,34 @@ export default function AdminDashboard() {
         {/* ── Appointments ── */}
         {tab === "Appointments" && (
           <>
-            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Appointments ({appointments.length})</h2>
-            {appointments.length === 0 && <p style={{ color: "#6b7280" }}>No appointments yet.</p>}
-            {appointments.map(a => (
-              <div key={a.id} style={card}>
-                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+              <h2 style={{ color: "#1e3a5f", margin: 0 }}>Appointments</h2>
+              {/* Sub-tabs */}
+              <div style={{ display: "flex", gap: 8 }}>
+                {["pending", "confirmed", "rejected"].map(t => (
+                  <button key={t} style={apptSubTabStyle(t)} onClick={() => setApptTab(t)}>
+                    {t === "pending" ? "⏳" : t === "confirmed" ? "✓" : "✕"}{" "}
+                    {t.charAt(0).toUpperCase() + t.slice(1)}{" "}
+                    <span style={{ marginLeft: 4, background: "rgba(0,0,0,0.1)", borderRadius: 10, padding: "1px 7px", fontSize: "0.75rem" }}>
+                      {appointments.filter(a => a.status === t).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {filteredAppts.length === 0 && (
+              <p style={{ color: "#6b7280" }}>
+                No {apptTab} appointments.
+              </p>
+            )}
+
+            {filteredAppts.map(a => (
+              <div key={a.id} style={{
+                ...card,
+                borderLeft: `4px solid ${a.status === "confirmed" ? "#059669" : a.status === "rejected" ? "#dc2626" : "#f59e0b"}`,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, alignItems: "flex-start" }}>
                   <div>
                     <span style={label}>{a.first_name} {a.last_name}</span>
                     <span style={val}>— {a.department}</span>
@@ -263,11 +416,28 @@ export default function AdminDashboard() {
                     {a.email && <span style={{ ...val, color: "#6b7280" }}> | {a.email}</span>}
                     <br />
                     <span style={label}>Date:</span><span style={val}>{a.preferred_date}</span>
+                    {a.preferred_time && <><span style={{ ...val, color: "#6b7280" }}> at {a.preferred_time}</span></>}
                     {a.notes && <><br /><span style={label}>Notes:</span><span style={val}>{a.notes}</span></>}
                     <br />
-                    <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 12, fontSize: "0.75rem", fontWeight: 600 }}>{a.status}</span>
+                    <span style={statusBadge(a.status)}>{a.status}</span>
                   </div>
-                  <button onClick={() => deleteRow("/api/appointments", a.id, setAppointments, appointments)} style={btn("#dc2626")}>Delete</button>
+
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <button onClick={() => setModalAppt(a)} style={{ ...btn("#1e3a5f"), padding: "6px 14px" }}>
+                      👁 View
+                    </button>
+                    {a.status === "pending" && (
+                      <>
+                        <button onClick={() => updateApptStatus(a, "confirmed")}
+                          style={{ ...btn("#059669"), padding: "6px 14px" }}>✓ Accept</button>
+                        <button onClick={() => updateApptStatus(a, "rejected")}
+                          style={{ ...btn("#dc2626"), padding: "6px 14px" }}>✕ Reject</button>
+                      </>
+                    )}
+                    <button onClick={() => deleteRow("/api/appointments", a.id, setAppointments, appointments)}
+                      style={{ ...btn("#6b7280"), padding: "6px 14px" }}>🗑 Delete</button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -470,7 +640,6 @@ export default function AdminDashboard() {
               </button>
             </form>
 
-            {/* Uploaded results list */}
             <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>
               Uploaded Results ({labResults.length})
             </h2>
