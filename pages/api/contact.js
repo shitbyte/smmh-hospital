@@ -1,4 +1,4 @@
-/ pages/api/contact.js
+ pages/api/contact.js
 // Receives POST from contact form, saves to Supabase contact_messages table
 
 import { createClient } from '@supabase/supabase-js';
