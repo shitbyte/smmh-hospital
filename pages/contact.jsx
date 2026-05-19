@@ -1,43 +1,116 @@
-/ pages/api/contact.js
-// Receives POST from contact form, saves to Supabase contact_messages table
+import { useState } from "react";
 
-import { createClient } from '@supabase/supabase-js';
+export default function Contact() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+  });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+  const [status, setStatus] = useState("");
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
 
-  const { name, email, phone, subject, message } = req.body;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (!name || !email || !message) {
-    return res.status(400).json({ error: 'Name, email, and message are required.' });
-  }
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
 
-  const { error } = await supabase
-    .from('contact_messages')
-    .insert([
-      {
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone?.trim() || null,
-        subject: subject?.trim() || null,
-        message: message.trim(),
-        status: 'unread',
-        category: null,
-        posted_to_reviews: false,
-      },
-    ]);
+      const data = await response.json();
 
-  if (error) {
-    console.error('Supabase insert error:', error);
-    return res.status(500).json({ error: 'Failed to save message. Please try again.' });
-  }
+      if (response.ok) {
+        setStatus("Message sent successfully!");
 
-  return res.status(200).json({ success: true, message: 'Message received successfully.' });
+        setFormData({
+          name: "",
+          email: "",
+          phone: "",
+          subject: "",
+          message: "",
+        });
+      } else {
+        setStatus(data.error || "Failed to send.");
+      }
+    } catch (error) {
+      setStatus("Server error.");
+    }
+  };
+
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>Contact Us</h1>
+
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          name="name"
+          placeholder="Name"
+          value={formData.name}
+          onChange={handleChange}
+          required
+        />
+
+        <br /><br />
+
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+        />
+
+        <br /><br />
+
+        <input
+          type="text"
+          name="phone"
+          placeholder="Phone"
+          value={formData.phone}
+          onChange={handleChange}
+        />
+
+        <br /><br />
+
+        <input
+          type="text"
+          name="subject"
+          placeholder="Subject"
+          value={formData.subject}
+          onChange={handleChange}
+        />
+
+        <br /><br />
+
+        <textarea
+          name="message"
+          placeholder="Message"
+          value={formData.message}
+          onChange={handleChange}
+          required
+        />
+
+        <br /><br />
+
+        <button type="submit">Send</button>
+      </form>
+
+      <p>{status}</p>
+    </div>
+  );
 }
