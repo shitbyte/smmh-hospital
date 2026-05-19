@@ -114,9 +114,25 @@ export default function ContactPage() {
             <p className="section-desc">Have a question or feedback? We will respond within 24 hours.</p>
           </div>
           <ContactForm />
-        </div>
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d13591.14671620622!2d74.24334699843983!3d31.61230454745414!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39191db3a43e14a7%3A0x9684836f3763f63f!2sSaira%20Miraj%20Memorial%20Hospital!5e0!3m2!1sen!2s!4v1779158785020!5m2!1sen!2s"
+            width="100%"
+            height="450"
+            style={{ border: 0, marginTop: 40, borderRadius: 8 }}
+            allowFullScreen=""
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+          
+            href="https://maps.google.com/?q=Saira+Miraj+Memorial+Hospital+Lahore"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display:"block", textAlign:"center", marginTop:12, color:"var(--teal)", fontWeight:600, fontSize:"0.9rem" }}
+          
+ </div>
       </section>
       <AppointmentSection />
     </Layout>
   );
 }
+
