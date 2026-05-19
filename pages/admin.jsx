@@ -1,5 +1,6 @@
 // pages/admin.jsx
 import { useState, useEffect } from "react";
+import AdminContactMessages from '../components/AdminContactMessages';
 
 const ADMIN_PASSWORD = "smmh2026";
 const LAB_PASSWORD   = "smmhlab2026";
@@ -26,7 +27,6 @@ function AppointmentModal({ appt, onClose, onAccept, onReject, onDelete }) {
         background: "#fff", borderRadius: 14, padding: 32, width: 480, maxWidth: "90vw",
         boxShadow: "0 8px 40px rgba(0,0,0,0.18)", position: "relative"
       }}>
-        {/* Close */}
         <button onClick={onClose} style={{
           position: "absolute", top: 14, right: 16, background: "none", border: "none",
           fontSize: "1.4rem", cursor: "pointer", color: "#6b7280"
@@ -34,7 +34,6 @@ function AppointmentModal({ appt, onClose, onAccept, onReject, onDelete }) {
 
         <h3 style={{ color: "#1e3a5f", marginBottom: 20, fontSize: "1.1rem" }}>Appointment Details</h3>
 
-        {/* Status badge */}
         <div style={{ marginBottom: 16 }}>
           <span style={{
             padding: "4px 12px", borderRadius: 20, fontSize: "0.78rem", fontWeight: 700,
@@ -43,7 +42,6 @@ function AppointmentModal({ appt, onClose, onAccept, onReject, onDelete }) {
           }}>{appt.status?.toUpperCase()}</span>
         </div>
 
-        {/* Fields */}
         {[
           ["Patient", `${appt.first_name} ${appt.last_name}`],
           ["Department", appt.department],
@@ -60,7 +58,6 @@ function AppointmentModal({ appt, onClose, onAccept, onReject, onDelete }) {
           </div>
         ))}
 
-        {/* Action buttons */}
         <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
           {isPending && (
             <>
@@ -88,25 +85,20 @@ export default function AdminDashboard() {
   const [tab, setTab]         = useState("Appointments");
   const [loading, setLoading] = useState(false);
 
-  // Admin data states
   const [appointments, setAppointments]   = useState([]);
   const [applications, setApplications]   = useState([]);
-  const [messages, setMessages]           = useState([]);
   const [jobPostings, setJobPostings]     = useState([]);
   const [announcements, setAnnouncements] = useState([]);
 
-  // Appointment sub-tab & modal
-  const [apptTab, setApptTab]       = useState("pending");
-  const [modalAppt, setModalAppt]   = useState(null);
+  const [apptTab, setApptTab]     = useState("pending");
+  const [modalAppt, setModalAppt] = useState(null);
 
-  // Admin form states
   const [jobForm, setJobForm] = useState({ title: "", department: "", type: "Full-time", description: "", deadline: "" });
   const [newsForm, setNewsForm] = useState({ title: "", description: "", image_url: "" });
   const [newsImage, setNewsImage] = useState(null);
   const [posting, setPosting] = useState(false);
   const [postMsg, setPostMsg] = useState("");
 
-  // Lab states
   const [labResults, setLabResults]     = useState([]);
   const [labLoading, setLabLoading]     = useState(false);
   const [labFile, setLabFile]           = useState(null);
@@ -122,27 +114,23 @@ export default function AdminDashboard() {
     else setPwErr("Incorrect password.");
   };
 
-  // ── Fetch admin data ────────────────────────────────────────────────────────
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [a, ap, m, jp, an] = await Promise.all([
+      const [a, ap, jp, an] = await Promise.all([
         fetch("/api/appointments?admin=1").then(r => r.json()),
         fetch("/api/careers?admin=1").then(r => r.json()),
-        fetch("/api/contact?admin=1").then(r => r.json()),
         fetch("/api/job-postings?admin=1").then(r => r.json()),
         fetch("/api/news?admin=1").then(r => r.json()),
       ]);
       setAppointments(a.data || []);
       setApplications(ap.data || []);
-      setMessages(m.data || []);
       setJobPostings(jp.data || []);
       setAnnouncements(an.data || []);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  // ── Fetch lab results ───────────────────────────────────────────────────────
   const fetchLabResults = async () => {
     setLabLoading(true);
     try {
@@ -164,7 +152,6 @@ export default function AdminDashboard() {
     setter(list.filter(r => r.id !== id));
   };
 
-  // ── Update appointment status ───────────────────────────────────────────────
   const updateApptStatus = async (appt, newStatus) => {
     try {
       await fetch("/api/appointments", {
@@ -182,7 +169,6 @@ export default function AdminDashboard() {
     deleteRow("/api/appointments", appt.id, setAppointments, appointments);
   };
 
-  // ── Upload image for announcements ──────────────────────────────────────────
   const uploadImage = async (file) => {
     const fileName = `news/${Date.now()}_${file.name.replace(/\s/g, "_")}`;
     const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/uploads/${fileName}`;
@@ -198,7 +184,6 @@ export default function AdminDashboard() {
     return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${fileName}`;
   };
 
-  // ── Upload lab result file ──────────────────────────────────────────────────
   const uploadLabFile = async (file) => {
     const fileName = `${Date.now()}_${file.name.replace(/\s/g, "_")}`;
     const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/lab-results/${fileName}`;
@@ -251,7 +236,6 @@ export default function AdminDashboard() {
     setPosting(false);
   };
 
-  // ── Submit lab result ───────────────────────────────────────────────────────
   const submitLabResult = async (e) => {
     e.preventDefault();
     if (!labFile) return setLabMsg("❌ Please select a file to upload.");
@@ -285,7 +269,6 @@ export default function AdminDashboard() {
     setLabUploading(false);
   };
 
-  // ── Login screen ─────────────────────────────────────────────────────────────
   if (!authed) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f1f5f9" }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: 40, width: 340, boxShadow: "0 4px 24px rgba(0,0,0,0.1)" }}>
@@ -313,7 +296,6 @@ export default function AdminDashboard() {
     borderBottom: tab === t ? "2px solid #1e3a5f" : "2px solid transparent",
   });
 
-  // Appointment sub-tab style
   const apptSubTabStyle = (t) => ({
     padding: "7px 18px", border: "none", cursor: "pointer", fontWeight: 600,
     fontSize: "0.82rem", borderRadius: 20,
@@ -331,7 +313,6 @@ export default function AdminDashboard() {
   const val        = { color: "#374151", marginLeft: 6 };
   const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.9rem", boxSizing: "border-box", marginBottom: 12 };
 
-  // Filtered appointments by sub-tab
   const filteredAppts = appointments.filter(a => a.status === apptTab);
 
   const statusBadge = (status) => {
@@ -349,7 +330,6 @@ export default function AdminDashboard() {
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
 
-      {/* Modal */}
       {modalAppt && (
         <AppointmentModal
           appt={modalAppt}
@@ -383,7 +363,6 @@ export default function AdminDashboard() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
               <h2 style={{ color: "#1e3a5f", margin: 0 }}>Appointments</h2>
-              {/* Sub-tabs */}
               <div style={{ display: "flex", gap: 8 }}>
                 {["pending", "confirmed", "rejected"].map(t => (
                   <button key={t} style={apptSubTabStyle(t)} onClick={() => setApptTab(t)}>
@@ -398,9 +377,7 @@ export default function AdminDashboard() {
             </div>
 
             {filteredAppts.length === 0 && (
-              <p style={{ color: "#6b7280" }}>
-                No {apptTab} appointments.
-              </p>
+              <p style={{ color: "#6b7280" }}>No {apptTab} appointments.</p>
             )}
 
             {filteredAppts.map(a => (
@@ -421,12 +398,8 @@ export default function AdminDashboard() {
                     <br />
                     <span style={statusBadge(a.status)}>{a.status}</span>
                   </div>
-
-                  {/* Action buttons */}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <button onClick={() => setModalAppt(a)} style={{ ...btn("#1e3a5f"), padding: "6px 14px" }}>
-                      👁 View
-                    </button>
+                    <button onClick={() => setModalAppt(a)} style={{ ...btn("#1e3a5f"), padding: "6px 14px" }}>👁 View</button>
                     {a.status === "pending" && (
                       <>
                         <button onClick={() => updateApptStatus(a, "confirmed")}
@@ -476,24 +449,7 @@ export default function AdminDashboard() {
 
         {/* ── Contact Messages ── */}
         {tab === "Contact Messages" && (
-          <>
-            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Contact Messages ({messages.length})</h2>
-            {messages.length === 0 && <p style={{ color: "#6b7280" }}>No messages yet.</p>}
-            {messages.map(m => (
-              <div key={m.id} style={card}>
-                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                  <div>
-                    <span style={label}>{m.name}</span>
-                    <span style={val}>— {m.email}</span>
-                    {m.phone && <span style={{ ...val, color: "#6b7280" }}> | {m.phone}</span>}
-                    {m.subject && <><br /><span style={label}>Subject:</span><span style={val}>{m.subject}</span></>}
-                    <br /><span style={label}>Message:</span><span style={val}>{m.message}</span>
-                  </div>
-                  <button onClick={() => deleteRow("/api/contact", m.id, setMessages, messages)} style={btn("#dc2626")}>Delete</button>
-                </div>
-              </div>
-            ))}
-          </>
+          <AdminContactMessages />
         )}
 
         {/* ── Job Postings ── */}
@@ -640,9 +596,7 @@ export default function AdminDashboard() {
               </button>
             </form>
 
-            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>
-              Uploaded Results ({labResults.length})
-            </h2>
+            <h2 style={{ color: "#1e3a5f", marginBottom: 16 }}>Uploaded Results ({labResults.length})</h2>
             {labLoading && <p>Loading...</p>}
             {!labLoading && labResults.length === 0 && <p style={{ color: "#6b7280" }}>No lab results uploaded yet.</p>}
             {labResults.map(r => (
