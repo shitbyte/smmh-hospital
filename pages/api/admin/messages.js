@@ -1,7 +1,4 @@
 // pages/api/admin/messages.js
-// Admin-only endpoint — uses service role key (bypasses RLS)
-// Supports: GET all messages, PATCH category, POST to reviews
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -22,7 +19,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ messages: data });
   }
 
-  // --- PATCH: set category on a message ---
+  // --- PATCH: set category/status on a message ---
   if (req.method === 'PATCH') {
     const { id, category, status } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -40,7 +37,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
   }
 
-  // --- POST: post a message as the live review ---
+  // --- POST: toggle posted_to_reviews on a message ---
   if (req.method === 'POST') {
     const { action, id } = req.body;
 
@@ -48,40 +45,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'action=post_review and id are required' });
     }
 
-    // Fetch the message to post
+    // Check current state
     const { data: msg, error: fetchErr } = await supabase
       .from('contact_messages')
-      .select('id, name, message')
+      .select('id, posted_to_reviews')
       .eq('id', id)
       .single();
 
     if (fetchErr || !msg) return res.status(404).json({ error: 'Message not found' });
 
-    // Upsert into reviews table (always id=1, replacing previous)
-    const { error: reviewErr } = await supabase
-      .from('reviews')
-      .upsert({
-        id: 1,
-        name: msg.name,
-        message: msg.message,
-        message_id: msg.id,
-        posted_at: new Date().toISOString(),
-      });
+    // Toggle: if already posted, un-post it; if not posted, post it
+    const newValue = !msg.posted_to_reviews;
 
-    if (reviewErr) return res.status(500).json({ error: reviewErr.message });
-
-    // Mark this message as posted_to_reviews and clear previous
-    await supabase
+    const { error: updateErr } = await supabase
       .from('contact_messages')
-      .update({ posted_to_reviews: false })
-      .eq('posted_to_reviews', true);
-
-    await supabase
-      .from('contact_messages')
-      .update({ posted_to_reviews: true })
+      .update({ posted_to_reviews: newValue })
       .eq('id', id);
 
-    return res.status(200).json({ success: true });
+    if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+    return res.status(200).json({ success: true, posted: newValue });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
