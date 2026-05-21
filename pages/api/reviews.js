@@ -1,5 +1,5 @@
 // pages/api/reviews.js
-// Public endpoint — returns the single active review for the website
+// Public endpoint — returns all reviews marked as posted_to_reviews = true
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -14,14 +14,15 @@ export default async function handler(req, res) {
   }
 
   const { data, error } = await supabase
-    .from('reviews')
-    .select('name, message, posted_at')
-    .eq('id', 1)
-    .single();
+    .from('contact_messages')
+    .select('id, name, email, message, created_at')
+    .eq('posted_to_reviews', true)
+    .order('created_at', { ascending: false });
 
-  if (error || !data || !data.name) {
-    return res.status(200).json({ review: null });
+  if (error) {
+    console.error('Supabase error:', error);
+    return res.status(200).json({ reviews: [] });
   }
 
-  return res.status(200).json({ review: data });
+  return res.status(200).json({ reviews: data || [] });
 }

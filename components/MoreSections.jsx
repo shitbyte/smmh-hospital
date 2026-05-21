@@ -133,6 +133,37 @@ export function WhyUsSection() {
 
 /* ─── Testimonials ──────────────────────────────────────────────────────── */
 export function TestimonialsSection() {
+  const [liveReviews, setLiveReviews] = useState([]);
+  const [loading, setLoading]         = useState(true);
+
+  useEffect(() => {
+    fetch("/api/reviews")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.reviews)) setLiveReviews(data.reviews);
+        else if (data.review?.name)      setLiveReviews([data.review]);
+        else                             setLiveReviews([]);
+      })
+      .catch(() => setLiveReviews([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Decide how many slots to fill:
+  //   6 if we have 5+ reviews  (2-row grid of 3)
+  //   3 otherwise              (single row of 3)
+  // API already returns newest-first, so slice(0, limit) = latest N.
+  const limit = liveReviews.length >= 5 ? 6 : 3;
+
+  const displayReviews = !loading && liveReviews.length > 0
+    ? liveReviews.slice(0, limit).map((r, i) => ({
+        id:       r.id || i,
+        name:     r.name,
+        location: r.city || r.location || "Patient",
+        rating:   r.rating || 5,
+        quote:    r.message,
+      }))
+    : TESTIMONIALS.slice(0, 3);   // fallback: show 3 hardcoded
+
   return (
     <section className={`section`} style={{ background: "var(--cream)" }} id="testimonials">
       <div className="container">
@@ -144,22 +175,30 @@ export function TestimonialsSection() {
           </p>
         </div>
 
-        <div className={s.testiGrid}>
-          {TESTIMONIALS.map((t) => (
-            <div key={t.id} className={`${s.testiCard} reveal`}>
-              <div className={s.stars}>{"★".repeat(t.rating)}</div>
-              <div className={s.testiQuote}>&ldquo;</div>
-              <p className={s.testiText}>{t.quote}</p>
-              <div className={s.testiAuthor}>
-                <div className={s.testiAvatar}>{t.name.charAt(t.name.lastIndexOf(" ") + 1)}</div>
-                <div>
-                  <div className={s.testiName}>{t.name}</div>
-                  <div className={s.testiRole}>{t.location}</div>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280" }}>
+            Loading reviews…
+          </div>
+        ) : (
+          <div className={s.testiGrid}>
+            {displayReviews.map((t) => (
+              <div key={t.id} className={`${s.testiCard} reveal`}>
+                <div className={s.stars}>{"★".repeat(Math.floor(t.rating || 5))}</div>
+                <div className={s.testiQuote}>&ldquo;</div>
+                <p className={s.testiText}>{t.quote || t.message}</p>
+                <div className={s.testiAuthor}>
+                  <div className={s.testiAvatar}>
+                    {t.name.charAt(t.name.lastIndexOf(" ") + 1)}
+                  </div>
+                  <div>
+                    <div className={s.testiName}>{t.name}</div>
+                    <div className={s.testiRole}>{t.location}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
